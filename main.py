@@ -1,4 +1,4 @@
-from random import randint
+from random import randint, choice
 
 import numpy as np
 import matplotlib as mpl
@@ -73,14 +73,17 @@ class Simulation:
         """
         print(self.state.molecules)
         for monomer in self.state.molecules:
-
+            mono = ""
             for functionality in monomer.functionalities:
-                print(chr(65+functionality), end='')
-            print(monomer.position)
+                mono += chr(65+functionality)
+            if choice([True, False]):
+                mono = mono[::-1]
+            alignment = (self.bounds + monomer.position[0]) * 3
+            print(f"{alignment * ' '}{mono}")
+            #print(monomer.position)
         pass
 
 
 if __name__ == "__main__":
-    print(ord("A"))
     test = Simulation([10], 1)
     test.display_sim()
