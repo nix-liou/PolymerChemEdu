@@ -1,3 +1,5 @@
+from random import randint
+
 import numpy as np
 import matplotlib as mpl
 from dataclasses import dataclass
@@ -18,13 +20,13 @@ class Monomer:
 class SimulationState:
     """
     Dataclass holding current simulation state, effectively as a list of graphs, each graph being a polymer chain. Previous and future states are linked to allow for traversal forwards and backwars in simulation
+    sim_type 1 is basic condensation (AB monomers)
     """
     molecules: list[Monomer]
     root: Monomer = None
     prev_state: Optional['SimulationState'] = None
     next_state: Optional['SimulationState'] = None
-
-# this is a test comment
+    sim_type: int = 0
 
 class Simulation:
     def __init__(self, monomer_makeup: list[int], polymerization_type, ) -> None:
@@ -32,21 +34,22 @@ class Simulation:
         :param monomer_makeup: list of types of monomers, each a tuple of parameters for the monomer makeup. (monomer count, list functionalities present, average functionality, etc)
         :param polymerization_type: chain vs step growth
         """
-        state = SimulationState(root=self.gen_starting_monomers(monomer_makeup))
+        self.bounds = 10
+        self.state = SimulationState(molecules=self.gen_starting_monomers(monomer_makeup),sim_type=polymerization_type)
 
-        return None
 
-    def gen_starting_monomers(self, monomer_makeup: list[int]) -> SimulationState:
+    def gen_starting_monomers(self, monomer_makeup: list[int]) -> list[Monomer]:
         """
         Starting monomer makeup to be created and distributed. Will calculate initial positions of all monomers
         :param monomer_makeup:
         :return:
         """
-        new_state = SimulationState()
+        new_monomers = []
         for i in range(monomer_makeup[0]):
-            new_state.molecules.append(Monomer())
 
-        return new_state
+            new_monomers.append(Monomer(functionalities=[0, 1], position=(randint(-self.bounds, self.bounds), randint(-self.bounds, self.bounds))))
+
+        return new_monomers
 
     def step_forward(self):
         """
@@ -68,5 +71,16 @@ class Simulation:
         Representative plot of the polymerization will show monomers as dots with lines as bonds, colored depending on the functionality.
         :return:
         """
+        print(self.state.molecules)
+        for monomer in self.state.molecules:
+
+            for functionality in monomer.functionalities:
+                print(chr(65+functionality), end='')
+            print(monomer.position)
         pass
 
+
+if __name__ == "__main__":
+    print(ord("A"))
+    test = Simulation([10], 1)
+    test.display_sim()
