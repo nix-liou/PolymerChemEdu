@@ -1,9 +1,12 @@
+import random
 from random import randint, choice
 
-import numpy as np
-import matplotlib as mpl
+import sys
+import math
+import matplotlib.pyplot as plt
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Union
+from matplotlib.patches import Rectangle, Circle, Polygon
 
 @dataclass
 class Monomer:
@@ -12,8 +15,8 @@ class Monomer:
     Bonds indicate already bonded other monomers
     Position indicates location in the simulation for display/simulation purposes
     """
-    functionalities: list[int] = list[1, 1]
-    bonds: list[Optional['Monomer']] = list[None]
+    functionalities: list[int] = list[0, 1]
+    bonds: list[tuple[int, Union['Monomer', None]]] = None
     position: tuple[float, float] = tuple[0, 0]
 
 @dataclass
@@ -26,7 +29,7 @@ class SimulationState:
     root: Monomer = None
     prev_state: Optional['SimulationState'] = None
     next_state: Optional['SimulationState'] = None
-    sim_type: int = 0
+
 
 class Simulation:
     def __init__(self, monomer_makeup: list[int], polymerization_type, ) -> None:
@@ -35,7 +38,13 @@ class Simulation:
         :param polymerization_type: chain vs step growth
         """
         self.bounds = 10
-        self.state = SimulationState(molecules=self.gen_starting_monomers(monomer_makeup),sim_type=polymerization_type)
+        self.monomer_length = .2
+        self.colors = ["red", "blue"]
+        self.polymerization_type = polymerization_type
+        self.state = SimulationState(molecules=self.gen_starting_monomers(monomer_makeup))
+        self.fig, self.ax = plt.subplots()
+
+        self.fig.canvas.mpl_connect('key_press_event', self.on_press)
 
 
     def gen_starting_monomers(self, monomer_makeup: list[int]) -> list[Monomer]:
@@ -44,10 +53,11 @@ class Simulation:
         :param monomer_makeup:
         :return:
         """
+
         new_monomers = []
         for i in range(monomer_makeup[0]):
 
-            new_monomers.append(Monomer(functionalities=[0, 1], position=(randint(-self.bounds, self.bounds), randint(-self.bounds, self.bounds))))
+            new_monomers.append(Monomer(functionalities=[0, 1], position=(random.random()*self.bounds, random.random()*self.bounds)))
 
         return new_monomers
 
@@ -56,7 +66,35 @@ class Simulation:
         Advance one simulation step and save new SimulationState. Each simulation step updates the position data of each monomer and makes new connections.
         :return:
         """
-        pass
+        new_molecules = []
+
+        if self.polymerization_type == 1:  #Condensation polymerization (assuming AB monomers)
+            for molecule, i in self.state.molecules:
+                search = True
+                molecule2 = self.state.molecules[i + 1]
+
+                seek_funcs = molecule2.functionalities
+                while search:
+                    for seek, j in enumerate(seek_funcs):
+                        for sought, k in enumerate(molecule.functionalities):  # check if the monomer "root" of the molecule has a matching functionality to bond
+                            if search is True and seek == sought:
+                                molecule2.functionalities.pop(j)
+                                molecule.functionalities.pop(k)
+                                molecule.bonds.append((sought, molecule2))
+                                self.state.molecules.pop(i)
+                                search = False
+                    for bond in molecule2.bonds:
+                        if bond is not None:
+                            molecule2 = bond[1]
+                            seek_funcs = molecule2.functionalities
+                        else:
+                            pass
+
+                pass
+
+        next_state = SimulationState(molecules=new_molecules, prev_state=self.state, root=self.state.root)
+        self.state.next_state = next_state
+
 
     def step_backwards(self):
         """
@@ -71,19 +109,53 @@ class Simulation:
         Representative plot of the polymerization will show monomers as dots with lines as bonds, colored depending on the functionality.
         :return:
         """
-        print(self.state.molecules)
-        for monomer in self.state.molecules:
-            mono = ""
-            for functionality in monomer.functionalities:
-                mono += chr(65+functionality)
-            if choice([True, False]):
-                mono = mono[::-1]
-            alignment = (self.bounds + monomer.position[0]) * 3
-            print(f"{alignment * ' '}{mono}")
-            #print(monomer.position)
-        pass
+        #print(self.state.molecules)
+
+        # for monomer in self.state.molecules:
+        #     mono = ""
+        #     for functionality in monomer.functionalities:
+        #         mono += chr(65+functionality)
+        #     if choice([True, False]):
+        #         mono = mono[::-1]
+        #     alignment = (self.bounds + monomer.position[0]) * 3
+        #     print(f"{alignment * ' '}{mono}")
+        #     #print(monomer.position)
+
+
+        for monomer in self.state.molecules:  # Goes through every listed molecule, and sketches it on the plot using patches, polygons, and circles
+            poly_patches = []  # This list contains the patches that will be drawn at the end
+            centers = []
+            rads = 2 * math.pi / (len(monomer.functionalities))  # Generalization for n functional groups
+            random_rotation = random.random() * math.pi  # Rotates every monomer randomly
+
+            for functionality, i in enumerate(monomer.functionalities):  # Maps out the colored circles that correspond to a polymerizable functional group
+                c = list(monomer.position)
+                c[0] += self.monomer_length * math.sin(i * rads + random_rotation)  # generating x and y coords. The "monomer position" of the first monomer in a molecule is used as the root, and the functional groups are placed evenly around it
+                c[1] += self.monomer_length * math.cos(i * rads + random_rotation)
+                poly_patches.append(Circle(c, self.monomer_length*.66, facecolor=self.colors[functionality], edgecolor="black", alpha=.4))  # Creates the circle patch. Facecolor is chosen by the integer value used for the functional group from the self.colors list of named colors
+                centers.append(c)
+
+            poly_patches.append(Polygon(centers, linewidth=2, edgecolor="black"))
+
+            for poly in poly_patches:
+                self.ax.add_patch(poly)  # Adds the patches to the plot
+
+        self.ax.set_ylim(-.5, self.bounds+.5)
+        self.ax.set_xlim(-.5, self.bounds+.5)
+
+        self.fig.savefig("test.png")
+
+    def on_press(self, event):  # Responds to keypress while code is running (in interactive mode) allowing updates etc (in theory)
+        #sys.stdout.flush()
+        if event.key == 'n':
+            self.step_forward()
+            self.fig.remove()
+            self.display_sim()
+
 
 
 if __name__ == "__main__":
-    test = Simulation([10], 1)
-    test.display_sim()
+
+    test = Simulation([100], 1)
+    test.display_sim()  # Update the plot
+    plt.show()  # Display it graphically
