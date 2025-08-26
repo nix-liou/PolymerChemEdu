@@ -16,7 +16,7 @@ class Monomer:
     Position indicates location in the simulation for display/simulation purposes
     """
     functionalities: list[int] = list[0, 1]
-    bonds: list[tuple[int, Union['Monomer', None]]] = None
+    bonds: list[tuple[Optional[int], Union['Monomer', None]]] = list[(None, None), (None, None)]
     position: tuple[float, float] = tuple[0, 0]
 
 @dataclass
@@ -29,6 +29,13 @@ class SimulationState:
     root: Monomer = None
     prev_state: Optional['SimulationState'] = None
     next_state: Optional['SimulationState'] = None
+
+def polymer_len(node: Monomer) -> int:
+    length = 0
+    while node is not None:
+        node = node.bonds[1][1]
+        length += 1
+    return length
 
 
 class Simulation:
@@ -69,7 +76,7 @@ class Simulation:
         new_molecules = []
 
         if self.polymerization_type == 1:  #Condensation polymerization (assuming AB monomers)
-            for molecule, i in self.state.molecules:
+            for i, molecule in enumerate(self.state.molecules):
                 search = True
                 molecule2 = self.state.molecules[i + 1]
 
@@ -78,11 +85,18 @@ class Simulation:
                     for seek, j in enumerate(seek_funcs):
                         for sought, k in enumerate(molecule.functionalities):  # check if the monomer "root" of the molecule has a matching functionality to bond
                             if search is True and seek == sought:
+
                                 molecule2.functionalities.pop(j)
                                 molecule.functionalities.pop(k)
-                                molecule.bonds.append((sought, molecule2))
+
+                                print(molecule.bonds)
+
+                                molecule.bonds = [molecule.bonds[0], (sought, molecule2)]
+                                molecule2.bonds = [(seek, molecule), molecule2.bonds[1]]
+
                                 self.state.molecules.pop(i)
                                 search = False
+
                     for bond in molecule2.bonds:
                         if bond is not None:
                             molecule2 = bond[1]
@@ -157,5 +171,6 @@ class Simulation:
 if __name__ == "__main__":
 
     test = Simulation([100], 1)
+    #test.step_forward()
     test.display_sim()  # Update the plot
     plt.show()  # Display it graphically
